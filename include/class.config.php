@@ -1,0 +1,595 @@
+<?php
+/*********************************************************************
+    class.config.php
+
+    osTicket config info manager. 
+
+    Peter Rotich <peter@osticket.com>
+    Copyright (c)  2006-2010 osTicket
+    http://www.osticket.com
+
+    Released under the GNU General Public License WITHOUT ANY WARRANTY.
+    See LICENSE.TXT for details.
+
+    vim: expandtab sw=4 ts=4 sts=4:
+    $Id: $
+**********************************************************************/
+
+require_once(INCLUDE_DIR.'class.email.php');
+
+class Config {
+    
+    var $id=0;
+    var $mysqltzoffset=0;
+    var $config=array();
+
+    var $defaultDept;   //Default Department    
+    var $defaultEmail;  //Default Email 
+    var $alertEmail;  //Alert Email
+    var $defaultSMTPEmail; //Default  SMTP Email
+
+    function Config($id) { 
+        $this->load($id);
+    }
+
+    function load($id) {
+
+        if($id && is_numeric($id)):
+         $this->id=$id;
+         $this->config=array();
+         $res=db_query('SELECT * FROM '.CONFIG_TABLE.' WHERE id='.$id);
+         if($res && db_num_rows($res))
+            $this->config=db_fetch_array($res); 
+        endif;
+        return $this->config?true:false;
+    }
+
+    //Initialize some default values.
+    function init(){
+        list($mysqltz)=db_fetch_row(db_query('SELECT @@session.time_zone '));
+        $this->setMysqlTZ($mysqltz);
+    }
+    
+    function reload() {
+        if($this->load($this->id))
+            $this->init();
+    }
+
+
+    function isHelpDeskOffline() {
+        return false;
+    }
+
+    function getAPIPassphrase(){
+        return '';
+    }
+
+    function getVersion(){
+        return '1.6 ST';
+    }
+
+    function setMysqlTZ($tz){
+        //TODO: Combine the 2 replace regex 
+        $this->mysqltzoffset=($tz=='SYSTEM')?preg_replace('/([+-]\d{2})(\d{2})/','\1',date('O')):preg_replace('/([+-]\d{2})(:)(\d{2})/','\1',$tz);
+    }
+    
+    function getMysqlTZoffset() {
+        return $this->mysqltzoffset;
+    }
+
+    /* Date & Time Formats */
+    function observeDaylightSaving() {
+        return false;
+    }
+    function getTimeFormat(){
+        return 'h:i A';
+    }
+    function getDateFormat(){
+        return 'm/d/Y';
+    }
+
+    function getDateTimeFormat(){
+        return 'm/d/Y g:i a';
+    }
+
+    function getDayDateTimeFormat(){
+        return 'D, M j Y g:ia';
+    }
+
+    function getId() {
+        return 1;
+    }
+   
+    function getTitle() {
+        return '';
+    }
+    
+    function getUrl() {
+        return $this->config['helpdesk_url'];        
+    }
+    
+    function getBaseUrl(){ //Same as above with no trailing slash.
+        return rtrim($this->getUrl(),'/');
+    }
+
+    function getConfig() {
+        return $this->config;
+    }
+
+    function getTZOffset(){
+        return '1.0';
+    }
+
+    function getPageSize() {
+        return 25;
+    }
+
+    function getGracePeriod() {
+        return 0 ;
+    }
+
+        
+    function getClientTimeout() {
+        return $this->getClientSessionTimeout();
+    }
+ 
+    function getClientSessionTimeout() {
+        return 30*60;
+    }
+
+    function getClientLoginTimeout() {
+        return 2*60;
+    }
+
+    function getClientMaxLogins() {
+        return 4;
+    }
+
+    function getStaffTimeout() {
+        return $this->getStaffSessionTimeout();
+    }
+        
+    function getStaffSessionTimeout() {                
+        return 0;
+    }
+
+    function getStaffLoginTimeout() {
+        return 60; 
+    }
+
+    function getStaffMaxLogins() {
+        return 4;
+    }
+
+    function getLockTime() {
+        return 3;
+    }
+
+    function getDefaultDeptId(){
+        return 1 ;
+    }
+
+    function getDefaultDept(){
+
+        if(!$this->defaultDept && $this->getDefaultDeptId())
+            $this->defaultDept= new Dept($this->getDefaultDeptId());
+        return $this->defaultDept;
+    }   
+
+    function getDefaultEmailId(){
+        return 1;
+    }
+
+    function getDefaultEmail(){
+
+        if(!$this->defaultEmail && $this->getDefaultEmailId())
+            $this->defaultEmail= new Email($this->getDefaultEmailId());
+        return $this->defaultEmail;
+    }
+
+    function getDefaultEmailAddress() {
+        $email=$this->getDefaultEmail();
+        return $email?$email->getAddress():null;
+    }
+
+    function getAlertEmailId() {
+        return 0;
+    }
+
+    function getAlertEmail(){
+
+        if(!$this->alertEmail && $this->config['alert_email_id'])
+            $this->alertEmail= new Email($this->config['alert_email_id']);
+        return $this->alertEmail;
+    }
+
+    function getDefaultSMTPEmail(){
+
+        
+        return 0;
+    }
+
+    function allowSMTPSpoofing() {
+        return 0;
+    }
+
+    function getDefaultPriorityId(){
+        return 2;
+    }
+
+    function getDefaultTemplateId() {
+        return 1;
+    }
+
+    function getMaxOpenTickets() {
+         return 0 ;
+    }
+
+    function getMaxFileSize(){
+        return 1048576 ;
+    }
+
+    function getLogLevel(){
+        return 2;
+    }
+
+    function getLogGracePeriod(){
+        return 12 ;
+    }
+
+    function logTicketActivity(){
+        return 1 ;
+    }
+
+    function clickableURLS() {
+        return true;
+    }
+        
+    function canFetchMail() {
+        return false;
+    }
+
+    function enableStaffIPBinding(){
+        return true ;
+    }
+
+    function enableCaptcha() {
+        
+        //Checking it in real time!
+        if(!extension_loaded('gd') || !function_exists('gd_info'))
+            return false;
+
+        return true;
+    }
+
+    function enableAutoCron() {
+        return true ;
+    }
+        
+    function enableEmailPiping() {
+        return false;
+    }
+
+    function allowPriorityChange() {
+        return false;
+    }
+
+        
+    function useEmailPriority() {
+        return false;
+    }
+
+    function getAdminEmail(){
+         return $this->config['admin_email'];
+    }
+
+    function getReplySeparator() {
+
+		return '-- do not edit --' ;
+    }
+  
+    function stripQuotedReply() {
+        return true;
+    }
+
+    function saveEmailHeaders() {
+        return true; 
+    }
+    
+    function useRandomIds() {
+        return true;
+    }
+
+    function autoRespONNewTicket() {
+        return false;
+    }
+    
+    function autoRespONNewMessage() {
+        return false;
+    }
+
+    function notifyONNewStaffTicket(){
+        return false;
+    }
+
+    function alertONNewMessage() {
+        return false;
+    }
+
+    function alertLastRespondentONNewMessage() {
+        return true; 
+    }
+   
+    function alertAssignedONNewMessage() {
+        return true ;
+    }
+    
+    function alertDeptManagerONNewMessage() {
+        return false;
+    }
+
+    function alertONNewNote() {
+        return false;
+    }
+
+    function alertLastRespondentONNewNote() {
+        return true;
+    }
+
+    function alertAssignedONNewNote() {
+        return true;
+    }
+
+    function alertDeptManagerONNewNote() {
+        return false;
+    }
+
+    function alertONNewTicket() {
+        return false;
+    }
+
+    function alertAdminONNewTicket() {
+        return true;
+    }
+     
+    function alertDeptManagerONNewTicket() {
+        return true;
+    }
+
+    function alertDeptMembersONNewTicket() {
+        return false;
+    }
+
+    function alertONOverdueTicket() {
+        return false;
+    }
+
+    function alertAssignedONOverdueTicket() {
+        return true;
+    }
+
+    function alertDeptManagerONOverdueTicket() {
+        return true;
+    }
+
+    function alertDeptMembersONOverdueTicket() {
+        return false;
+    }
+
+    function autoAssignReopenedTickets() {
+        return true;
+    }
+
+    function showAssignedTickets() {
+        return false;
+    }
+
+    function showAnsweredTickets() {
+        return false;
+    }
+        
+    function hideStaffName() {
+        return false;
+    }
+
+    function sendOverLimitNotice() {
+        return false;
+    }
+        
+  
+    function alertONSQLError() {
+        return false;                    
+    }
+    function alertONLoginError() {
+        return true;
+    }
+
+    function alertONMailParseError() {
+        return false;
+    }
+
+    
+
+    /* Attachments */
+
+    function emailAttachments() {
+        return false;
+    }
+
+    function allowAttachments() {
+        return false;
+    }
+
+    function allowOnlineAttachments() {
+        return false;
+    }
+
+    function allowAttachmentsOnlogin() {
+        return false;
+    }
+    
+    function allowEmailAttachments() {
+        return false;
+    }
+
+    function getUploadDir() {
+        return '';
+    }
+    
+    //simply checking if destination dir is usable..nothing to do with permission to upload!
+    function canUploadFiles() {   
+       return false;
+    }
+
+
+    function updatePref($var,&$errors) {
+      
+        if(!$var || $errors)
+            return false;
+        
+        $f=array();
+        $f['helpdesk_url']=array('type'=>'string',   'required'=>1, 'error'=>'Helpdesk URl required'); //TODO: Add url validation
+        $f['helpdesk_title']=array('type'=>'string',   'required'=>1, 'error'=>'Helpdesk title required');
+        $f['default_dept_id']=array('type'=>'int',   'required'=>1, 'error'=>'Default Dept. required');
+        $f['default_email_id']=array('type'=>'int',   'required'=>1, 'error'=>'Default email required');
+        $f['default_template_id']=array('type'=>'int',   'required'=>1, 'error'=>'You must select template.');
+        $f['staff_session_timeout']=array('type'=>'int',   'required'=>1, 'error'=>'Enter idle time in minutes');
+        $f['client_session_timeout']=array('type'=>'int',   'required'=>1, 'error'=>'Enter idle time in minutes');
+        $f['time_format']=array('type'=>'string',   'required'=>1, 'error'=>'Time format required'); //TODO: Add date format validation  
+        $f['date_format']=array('type'=>'string',   'required'=>1, 'error'=>'Date format required');
+        $f['datetime_format']=array('type'=>'string',   'required'=>1, 'error'=>'Datetime format required');
+        $f['daydatetime_format']=array('type'=>'string',   'required'=>1, 'error'=>'Day, Datetime format required');
+        $f['admin_email']=array('type'=>'email',   'required'=>1, 'error'=>'Valid email required');
+        $f['autolock_minutes']=array('type'=>'int',   'required'=>1, 'error'=>'Enter lock time in minutes');
+        //TODO: check option fields for validity.
+
+        //do the validation.
+        $val = new Validator();        
+        $val->setFields($f);
+        if(!$val->validate($var)){
+            $errors=array_merge($errors,$val->errors());                                        
+        }
+                        
+        if($var['ticket_alert_active'] 
+                && (!isset($var['ticket_alert_admin']) 
+                    && !isset($var['ticket_alert_dept_manager'])
+                    && !isset($var['ticket_alert_dept_members']))){        
+            $errors['ticket_alert_active']='No target recipient(s) selected';
+        }       
+        if($var['message_alert_active']
+                && (!isset($var['message_alert_laststaff'])
+                    && !isset($var['message_alert_assigned'])
+                    && !isset($var['message_alert_dept_manager']))){
+            $errors['message_alert_active']='No target recipient(s) selected';
+        }
+
+        if($var['note_alert_active']
+                && (!isset($var['note_alert_laststaff'])
+                    && !isset($var['note_alert_assigned'])
+                    && !isset($var['note_alert_dept_manager']))){
+            $errors['note_alert_active']='No target recipient(s) selected';
+        }
+
+        if($var['strip_quoted_reply'] && !$var['reply_separator'])
+            $errors['reply_separator']='Reply separator required (?)';
+
+        if($var['enable_captcha']){
+            if (!extension_loaded('gd'))
+                $errors['enable_captcha']='The GD extension required';
+            elseif(!function_exists('imagepng'))
+                $errors['enable_captcha']='PNG support required for Image Captcha';
+        }
+
+        if(!$errors['admin_email'] && Email::getIdByEmail($var['admin_email'])) //Make sure admin email is not also a system email.
+            $errors['admin_email']='Email already setup as system email';
+
+
+
+
+        if($errors) return false; //No go! 
+
+        //We are good to go...blanket update!
+        $sql= 'UPDATE '.CONFIG_TABLE.' SET isonline='.db_input($var['isonline']).
+            ',timezone_offset='.db_input($var['timezone_offset']).
+            ',enable_daylight_saving='.db_input(isset($var['enable_daylight_saving'])?1:0).
+            ',staff_ip_binding='.db_input(isset($var['staff_ip_binding'])?1:0).
+            ',staff_max_logins='.db_input($var['staff_max_logins']).
+            ',staff_login_timeout='.db_input($var['staff_login_timeout']).
+            ',staff_session_timeout='.db_input($var['staff_session_timeout']).
+            ',client_max_logins='.db_input($var['client_max_logins']).
+            ',client_login_timeout='.db_input($var['client_login_timeout']).
+            ',client_session_timeout='.db_input($var['client_session_timeout']).
+            ',max_page_size='.db_input($var['max_page_size']).
+            ',log_level='.db_input($var['log_level']).
+            ',log_graceperiod='.db_input($var['log_graceperiod']).
+            ',max_open_tickets='.db_input($var['max_open_tickets']).
+            ',autolock_minutes='.db_input($var['autolock_minutes']).
+            ',overdue_grace_period='.db_input($var['overdue_grace_period']).
+            ',alert_email_id='.db_input($var['alert_email_id']).
+            ',default_email_id='.db_input($var['default_email_id']).
+            ',default_dept_id='.db_input($var['default_dept_id']).
+            ',default_priority_id='.db_input($var['default_priority_id']).
+            ',default_template_id='.db_input($var['default_template_id']).
+            ',default_smtp_id='.db_input($var['default_smtp_id']).
+            ',spoof_default_smtp='.db_input(($var['default_smtp'] && isset($var['spoof_default_smtp']))?1:0).
+            ',clickable_urls='.db_input(isset($var['clickable_urls'])?1:0).
+            ',allow_priority_change='.db_input(isset($var['allow_priority_change'])?1:0).
+            ',use_email_priority='.db_input(isset($var['use_email_priority'])?1:0).
+            ',enable_captcha='.db_input(isset($var['enable_captcha'])?1:0).
+            ',enable_auto_cron='.db_input(isset($var['enable_auto_cron'])?1:0).
+            ',enable_mail_fetch='.db_input(isset($var['enable_mail_fetch'])?1:0).
+            ',enable_email_piping='.db_input(isset($var['enable_email_piping'])?1:0).
+            ',send_sql_errors='.db_input(isset($var['send_sql_errors'])?1:0).
+            ',send_login_errors='.db_input(isset($var['send_login_errors'])?1:0).
+            ',save_email_headers='.db_input(isset($var['save_email_headers'])?1:0).
+            ',strip_quoted_reply='.db_input(isset($var['strip_quoted_reply'])?1:0).
+            ',log_ticket_activity='.db_input(isset($var['log_ticket_activity'])?1:0).
+            ',ticket_autoresponder='.db_input($var['ticket_autoresponder']).
+            ',message_autoresponder='.db_input($var['message_autoresponder']).
+            ',ticket_notice_active='.db_input($var['ticket_notice_active']).
+            ',ticket_alert_active='.db_input($var['ticket_alert_active']).
+            ',ticket_alert_admin='.db_input(isset($var['ticket_alert_admin'])?1:0).
+            ',ticket_alert_dept_manager='.db_input(isset($var['ticket_alert_dept_manager'])?1:0).
+            ',ticket_alert_dept_members='.db_input(isset($var['ticket_alert_dept_members'])?1:0).
+            ',message_alert_active='.db_input($var['message_alert_active']).
+            ',message_alert_laststaff='.db_input(isset($var['message_alert_laststaff'])?1:0).
+            ',message_alert_assigned='.db_input(isset($var['message_alert_assigned'])?1:0).
+            ',message_alert_dept_manager='.db_input(isset($var['message_alert_dept_manager'])?1:0).
+            ',note_alert_active='.db_input($var['note_alert_active']).
+            ',note_alert_laststaff='.db_input(isset($var['note_alert_laststaff'])?1:0).
+            ',note_alert_assigned='.db_input(isset($var['note_alert_assigned'])?1:0).
+            ',note_alert_dept_manager='.db_input(isset($var['note_alert_dept_manager'])?1:0).
+            ',overdue_alert_active='.db_input($var['overdue_alert_active']).
+            ',overdue_alert_assigned='.db_input(isset($var['overdue_alert_assigned'])?1:0).
+            ',overdue_alert_dept_manager='.db_input(isset($var['overdue_alert_dept_manager'])?1:0).
+            ',overdue_alert_dept_members='.db_input(isset($var['overdue_alert_dept_members'])?1:0).
+            ',auto_assign_reopened_tickets='.db_input(isset($var['auto_assign_reopened_tickets'])?1:0).
+            ',show_assigned_tickets='.db_input(isset($var['show_assigned_tickets'])?1:0).
+            ',show_answered_tickets='.db_input(isset($var['show_answered_tickets'])?1:0).
+            ',hide_staff_name='.db_input(isset($var['hide_staff_name'])?1:0).
+            ',overlimit_notice_active='.db_input($var['overlimit_notice_active']).
+            ',random_ticket_ids='.db_input($var['random_ticket_ids']).
+            ',time_format='.db_input($var['time_format']).
+            ',date_format='.db_input($var['date_format']).
+            ',datetime_format='.db_input($var['datetime_format']).
+            ',daydatetime_format='.db_input($var['daydatetime_format']).
+            ',reply_separator='.db_input(trim($var['reply_separator'])).
+            ',admin_email='.db_input($var['admin_email']).
+            ',helpdesk_title='.db_input($var['helpdesk_title']).
+            ',helpdesk_url='.db_input($var['helpdesk_url']).
+            ' WHERE id='.$this->getId();
+        //echo $sql;
+        if(db_query($sql)) {
+            if(db_affected_rows()) {//Something actually changed!!!!
+                $this->reload();//Reload the new info.
+                require_once(INCLUDE_DIR.'class.cron.php');
+                Sys::purgeLogs(); //Cleanup the logs --- too bad if it was a mistaken config.
+                Cron::TicketMonitor(); //Age & cleanup
+            }
+            return true;
+        }
+        return false;
+    }
+    
+}
+?>
